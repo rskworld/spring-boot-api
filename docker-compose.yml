@@ -1,0 +1,101 @@
+# Spring Boot REST API Docker Compose
+#
+# Enterprise-grade REST API with Spring Boot framework
+# Features JWT authentication, database integration, caching, and comprehensive API documentation
+#
+# @author RSK World
+# @author Molla Samser (Founder)
+# @author Rima Khatun (Designer & Tester)
+# @website https://rskworld.in
+# @contact help@rskworld.in, support@rskworld.in
+# @phone +91 93305 39277
+# @address Nutanhat, Mongolkote, Purba Burdwan, West Bengal, India, 713147
+# @year 2026
+#
+# This project is part of RSK World's free programming resources and source code collection.
+# Content used for educational purposes only. View Disclaimer: https://rskworld.in/disclaimer.php
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: spring-boot-postgres
+    environment:
+      POSTGRES_DB: spring_boot_api
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - spring-boot-network
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: spring-boot-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - spring-boot-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # Spring Boot Application
+  spring-boot-api:
+    build: .
+    container_name: spring-boot-api
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/spring_boot_api
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: password
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - spring-boot-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Nginx Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    container_name: spring-boot-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - spring-boot-api
+    networks:
+      - spring-boot-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  spring-boot-network:
+    driver: bridge
